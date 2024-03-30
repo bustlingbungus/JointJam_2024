@@ -47,9 +47,8 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
     Wall0Img = Gdiplus::Image::FromFile(L"Wall0.png");
 
     // instantiate player object
-    GameObject obj(Gdiplus::Image::FromFile(L"Player.png"),
+    player = new GameObject(Gdiplus::Image::FromFile(L"Player.png"),
         10, 10.0f, 10.0f, 200.0f, PLAYER);
-    player = &obj;
     gameObjects.push_back(player);
 
     // register window class
@@ -91,7 +90,6 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
         deltaTime = DeltaTime();
 
         updateGameObjects();
-
 
         // increment timer
         if (!gameIsPaused) timer += 0.01f;
@@ -442,96 +440,91 @@ void handleCollisions()
         // other objects collide with walls, not the other way around
         if (gameObjects[i]->entityType == WALL) continue;
         // hitbox for gameObjects[i]
-        RECT obj0 = {(LONG)gameObjects[i]->pos.x,                         (LONG)gameObjects[i]->pos.y, 
-                     LONG(gameObjects[i]->pos.x+gameObjects[i]->size[0]), LONG(gameObjects[i]->pos.y+gameObjects[i]->size[1])};
-
-        // when collision is detected: if object is a bullet -> delete obj, if target is not wall or player -> delete target
+        GameObject * obj0 = gameObjects[i];
+        int l0 = obj0->pos.x,      t0 = obj0->pos.y,
+            r0 = l0+obj0->size[0], b0 = t0+obj0->size[1];
 
         for (int j = 0; j < gameObjects.size(); j++)
         {
-            //std::cout << i <<' '<< j <<'\n';
-            if (i == j) continue; // object doesn't collide with itself
-            // hitbox for gameObjects[j]
-            RECT obj1 = {(LONG)gameObjects[j]->pos.x,                         (LONG)gameObjects[j]->pos.y, 
-                         LONG(gameObjects[j]->pos.x+gameObjects[j]->size[0]), LONG(gameObjects[j]->pos.y+gameObjects[j]->size[1])};
+            GameObject * obj1 = gameObjects[j];
+            if (i == j || obj1->entityType==PLAYER_BULLET) continue; // object wont collide with itself or bullets
 
-            // left side of obj0 colliding
-            if (obj0.left<obj1.right && obj0.right>obj1.right) {
-                //   side collision,                                  obj0 bigger than wall side
-                if ((obj0.top>obj1.top && obj0.bottom<obj1.bottom) || (obj0.top<obj1.top && obj0.bottom>obj1.bottom)) {
-                    // if obj0 0 is a bullet
-                    if (gameObjects[i]->entityType == PLAYER_BULLET) {
-                        int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+            int l1 = obj1->pos.x,      t1 = obj1->pos.y,
+                r1 = l1+obj1->size[0], b1 = t1+obj1->size[1];
+
+            if (l0<r1&&r0>r1) {
+                if ((t0>t1&&b0<b1)||(t0<t1&&b0>b1)) {
+                    if (obj0->entityType==PLAYER_BULLET) {
+                        int res = bulletHit(obj0, obj1, &i, &j);
                         if (res == 0) continue;
                         else break;
-                    } else gameObjects[i]->pos.x = obj1.right;
+                    } else obj0->pos.x = r1;
                 } else {
-                    // overlaps
-                    int dTop    = (obj1.bottom-obj0.top)*(obj0.bottom>obj1.bottom),
-                        dBottom = (obj0.bottom-obj1.top)*(obj0.top<obj1.top),
-                        dLeft   = obj1.right-obj0.left;
-                    if (dTop>0) { // top of obj0 collides with bottom left corner
-                        // if x overlap is greater, the TOP is colliding, move along x axis
-                        if (gameObjects[i]->entityType == PLAYER_BULLET) {
-                            int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                    int dTop    = (b1-t0)*(b0>b1),
+                        dBottom = (b0-t1)*(t0<t1),
+                        dLeft   = r1-l0;
+                    if (dTop>0) {
+                        if (obj0->entityType==PLAYER_BULLET) {
+                            int res = bulletHit(obj0, obj1, &i, &j);
                             if (res == 0) continue;
                             else break;
-                        } else if (dLeft>dTop) gameObjects[i]->pos.y = obj1.bottom;
-                        else gameObjects[i]->pos.x = obj1.right;
+                        } else if (dLeft>dTop) obj0->pos.y = b1;
+                        else obj0->pos.x = r1;
                     } else if (dBottom>0) {
-                        if (gameObjects[i]->entityType == PLAYER_BULLET) {
-                            int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                        if (obj0->entityType==PLAYER_BULLET) {
+                            int res = bulletHit(obj0, obj1, &i, &j);
                             if (res == 0) continue;
                             else break;
-                        } else if (dLeft>dBottom) gameObjects[i]->pos.y = obj1.top-gameObjects[i]->size[1];
-                        else gameObjects[i]->pos.x = obj1.right;
+                        } else if (dLeft>dBottom) obj0->pos.y = t1-obj0->size[1];
+                        else obj0->pos.x = r1;
                     }
                 }
-            } else if (obj0.right>obj1.left && obj0.left<obj1.left) { // right of obj0 colliding
-                if ((obj0.top>obj1.top && obj0.bottom<obj1.bottom) || (obj0.top<obj1.top && obj0.bottom>obj1.bottom)) {
-                    if (gameObjects[i]->entityType == PLAYER_BULLET) {
-                        int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+            } else if (r0>l1&&l0<l1) {
+                if ((t0>t1&&b0<b1)||(t0<t1&&b0>b1)) {
+                    if (obj0->entityType==PLAYER_BULLET) {
+                        int res = bulletHit(obj0, obj1, &i, &j);
                         if (res == 0) continue;
                         else break;
-                    } else gameObjects[i]->pos.x = obj1.left-gameObjects[i]->size[0];
+                    } else obj0->pos.x = l1-obj0->size[0];
                 } else {
-                    // overlaps
-                    int dTop    = (obj1.bottom-obj0.top)*(obj0.bottom>obj1.bottom),
-                        dBottom = (obj0.bottom-obj1.top)*(obj0.top<obj1.top),
-                        dRight  = obj0.right-obj1.left;
-                    if (dTop>0) { // top of obj0 collides with bottom left corner
-                        if (gameObjects[i]->entityType == PLAYER_BULLET) {
-                            int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                    int dTop    = (b1-t0)*(b0>b1),
+                        dBottom = (b0-t1)*(t0<t1),
+                        dRight  = r0-l1;
+                    if (dTop>0) {
+                        if (obj0->entityType==PLAYER_BULLET) {
+                            int res = bulletHit(obj0, obj1, &i, &j);
                             if (res == 0) continue;
                             else break;
-                        } else if (dRight>dTop) gameObjects[i]->pos.x = obj1.bottom;
+                        } else if (dRight>dTop) obj0->pos.y = b1;
+                        else obj0->pos.x = l1-obj0->size[0];
                     } else if (dBottom>0) {
-                        if (gameObjects[i]->entityType == PLAYER_BULLET) {
-                            int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                        if (obj0->entityType==PLAYER_BULLET) {
+                            int res = bulletHit(obj0, obj1, &i, &j);
                             if (res == 0) continue;
                             else break;
-                        } else if (dRight>dBottom) gameObjects[i]->pos.y = obj1.top-gameObjects[i]->size[1];
-                        else gameObjects[i]->pos.x = obj1.left-gameObjects[i]->size[0];
+                        } else if (dRight>dBottom) obj0->pos.y = t1-obj0->size[1];
+                        else obj0->pos.x = l1-obj0->size[0];
                     }
                 }
-            } else if (obj0.bottom>obj1.top && obj0.top<obj1.top) { // bottom of obj0 colliding
-                if ((obj0.left>obj1.left&&obj0.right<obj1.right) || (obj0.left<obj1.left&&obj0.right>obj1.right)) {
-                    if (gameObjects[i]->entityType == PLAYER_BULLET) {
-                        int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+            } else if (b0>t1&&t0<t1) {
+                if ((l0>l1&&r0<r1)||(l0<l1&&r0>r1)) {
+                    if (obj0->entityType==PLAYER_BULLET) {
+                        int res = bulletHit(obj0, obj1, &i, &j);
                         if (res == 0) continue;
                         else break;
-                    } else gameObjects[i]->pos.y = obj1.top-gameObjects[i]->size[1];
-                } // corner collisions handled in sides
-            } else if (obj0.top<obj1.bottom&&obj0.bottom>obj1.bottom) { // bottom of obj0 colliding
-                if ((obj0.left>obj1.left&&obj0.right<obj1.right) || (obj0.left<obj1.left&&obj0.right>obj1.right)) {
-                    if (gameObjects[i]->entityType == PLAYER_BULLET) {
-                        int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                    } else obj0->pos.y = t1-obj0->size[1];
+                }
+            } else if (t0<b1&&b0>b1) {
+                if ((l0>l1&&r0<r1)||(l0<l1&&r0>r1)) {
+                    if (obj0->entityType==PLAYER_BULLET) {
+                        int res = bulletHit(obj0, obj1, &i, &j);
                         if (res == 0) continue;
                         else break;
-                    } else gameObjects[i]->pos.y = obj1.bottom;
+                    } else obj0->pos.y = b1;
                 }
             }
         }
+
     }
 }
 

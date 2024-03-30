@@ -4,22 +4,26 @@
 int wndWidth, wndHeight; // dimensions of window
 float deltaTime = 0.0f, // time elapsed between frames
 fixedDeltaTime = 16.0f; // 60fps
-float flashRange = 300.0f; // range of the flashlight
-float ambientLightPercent = 0.1f; // 0 to 1, how bright the scene is without flashlight
+float timer = 0.0f; // time spent in the cave
+bool gameIsPaused = 0;
+// flashlight
+float flashRange = 300.0f, flashWidth = 0.5f; // range of the flashlight
+float ambientLightPercent = 0.3f, flashlightBrightness = 0.75f; // 0 to 1, how bright the scene/flashlight are
 
 // gdiplus
 Gdiplus::Image * background;
+Gdiplus::Image * bulletImg;
+Gdiplus::Image * Wall0Img;
 int bkgWidth, bkgHeight;
 
 // game objects
 std::vector<GameObject*> gameObjects;
 GameObject * player;
-int movementKeys = 0; // 0000wasd
+uint8 movementKeys = 0; // 0000wasd
 Vector2 playerToMouse = {1,0};
 
-
 // for functions
-clock_t begin_time = clock(); // for tracting deltaTime
+clock_t begin_time = clock(); // for tracking deltaTime
 
 // windows
 HBITMAP hOffscreenBitmap; // buffer frame not seen by user
@@ -33,11 +37,14 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
     ULONG_PTR gdiplusToken;
     Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
 
-    HBRUSH bkg = CreateSolidBrush(RGB(150,255,150)); // window background color, white
+    HBRUSH bkg = CreateSolidBrush(RGB(255,255,255)); // window background color, white
 
     // load background
     background = Gdiplus::Image::FromFile(L"Background.png");
     bkgWidth = background->GetWidth(); bkgHeight = background->GetHeight();
+    // bullet texture
+    bulletImg = Gdiplus::Image::FromFile(L"Bullet.png");
+    Wall0Img = Gdiplus::Image::FromFile(L"Wall0.png");
 
     // instantiate player object
     GameObject obj(Gdiplus::Image::FromFile(L"Player.png"),
@@ -61,8 +68,8 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
         L"Cave Game",           // window text
         WS_OVERLAPPEDWINDOW,    // window style
         // position and size, center of screen, 750x500 (2:3)
-        (GetSystemMetrics(SM_CXFULLSCREEN)-750)/2, (GetSystemMetrics(SM_CYFULLSCREEN)-500)/2,
-        750, 500,
+        (GetSystemMetrics(SM_CXFULLSCREEN)-900)/2, (GetSystemMetrics(SM_CYFULLSCREEN)-600)/2,
+        900, 600,
         NULL,                   // parent window
         NULL,                   // menu
         hInstance,              // instance handle
@@ -72,6 +79,10 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
 
     ShowWindow(hwnd, nCmdShow); // open the game window
 
+    // place a wall in the map
+    GameObject * wall = new GameObject(Wall0Img, 100, 100.0f, 100.0f, 0.0f, WALL);
+    gameObjects.push_back(wall);
+
     // main message loop
     MSG msg = { };
     while (GetMessage(&msg, NULL, 0, 0) > 0)
@@ -80,6 +91,10 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
         deltaTime = DeltaTime();
 
         updateGameObjects();
+
+
+        // increment timer
+        if (!gameIsPaused) timer += 0.01f;
 
         TranslateMessage(&msg);
         DispatchMessage(&msg);
@@ -122,6 +137,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     movementKeys |= 2; break;
                 case 0x44: // d
                     movementKeys |= 1; break;
+                case VK_ESCAPE:
+                    gameIsPaused = !gameIsPaused;
             }
             break;
 
@@ -139,14 +156,24 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             break;
 
+        case WM_LBUTTONDOWN: {
+            // get mouse coordinates on screen
+            int x = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
+
+            // shoot a bullet
+            if (!gameIsPaused) shootBullet(x, y);
+            break;
+        }
+
         case WM_MOUSEMOVE: {// player moved mouse
             // get the mouse coordinates on screen
             int x = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
 
+            if (gameIsPaused) break;
             // get coordinates in worldspace
             Vector2 mousePos = getWorldSpaceCoords((float)x, (float)y);
             // vector from player to mousePos
-            playerToMouse = {mousePos.x-player->pos.x, mousePos.y-player->pos.y};
+            playerToMouse = {mousePos.x-(player->pos.x+player->size[0]/2), mousePos.y-(player->pos.y+player->size[1]/2)};
             // normalised
             playerToMouse.normalise();
             break;
@@ -206,15 +233,6 @@ void createBufferFrame(HWND hwnd)
 
     Gdiplus::Graphics graphics(hOffscreenDC); // graphics object for drawing
 
-    // define vertices for triangle
-    Gdiplus::Point playerPos = getScreenCoords(player->pos.x+(player->size[0]/2), player->pos.y+(player->size[1]/2));
-    Gdiplus::Point bisector(INT(playerPos.X+(flashRange*playerToMouse.x)), INT(playerPos.Y+(flashRange*playerToMouse.y)));
-    Gdiplus::Point p1(INT(bisector.X-(playerToMouse.y*flashRange/2)), INT(bisector.Y+(playerToMouse.x*flashRange/2)));
-    Gdiplus::Point p2(INT(bisector.X+(playerToMouse.y*flashRange/2)), INT(bisector.Y-(playerToMouse.x*flashRange/2)));
-
-    // vertices for the flashlight triangle
-    Gdiplus::Point flashlightVertices[3] = {playerPos, p1, p2};
-
     // draw background
     drawBackgroundSection(graphics, background);
 
@@ -223,23 +241,14 @@ void createBufferFrame(HWND hwnd)
         drawGameObject(gameObjects[i], &graphics);
     }
 
-    // create a GraphicsPath to represent the triangle
-    Gdiplus::GraphicsPath path;
-    path.AddPolygon(flashlightVertices, 3);
-    // create a region from the GraphicsPath
-    Gdiplus::Region region(&path);
-    // create a rectangle representing the entire window
-    Gdiplus::Rect rect(0, 0, wndWidth, wndHeight);
-    // create a region from the rectangle
-    Gdiplus::Region windowRegion(rect);
-    
-    // exclude the triangular region from the window region
-    windowRegion.Exclude(&region);
+    // flashlight
+    illuminateFlashLight(graphics);
 
-
-    // cover screen in black
-    Gdiplus::SolidBrush blackBrush(Gdiplus::Color(int(255.0f*(1.0f-ambientLightPercent)), 0, 0, 0));
-    graphics.FillRegion(&blackBrush, &windowRegion);
+    if (gameIsPaused) {
+        Gdiplus::Rect rect(0, 0, wndWidth, wndHeight);
+        Gdiplus::SolidBrush pauseBrush(Gdiplus::Color(150, 0,0,0));
+        graphics.FillRectangle(&pauseBrush, rect);
+    }
 
     // deallocate resources
 }
@@ -283,7 +292,9 @@ void updateVelocities()
                 player->velocity.y = player->moveSpeed * (bool(movementKeys&2) - bool(movementKeys&8));
                 break;
 
-            default: std::cout << "unknown entity\n"; break;
+            case PLAYER_BULLET: break; // constant velocity, no need to update
+
+            default: std::cout << "unknown entity: " << i << '\n'; break;
         }
     }
 }
@@ -299,6 +310,7 @@ void updatePositions()
 
 void updateGameObjects()
 {
+    if (gameIsPaused) return;
     updateVelocities();
     updatePositions();
 }
@@ -365,4 +377,181 @@ Gdiplus::Point getScreenCoords(float x, float y)
     else y -= player->pos.y-height;
 
     return Gdiplus::Point((INT)x, (INT)y);
+}
+
+void illuminateFlashLight(Gdiplus::Graphics& graphics)
+{
+    // define vertices for triangle
+    Gdiplus::Point playerPos = getScreenCoords(player->pos.x+(player->size[0]/2), player->pos.y+(player->size[1]/2)),
+    bisector(INT(playerPos.X+(flashRange*playerToMouse.x)), INT(playerPos.Y+(flashRange*playerToMouse.y))),
+    p1(INT(bisector.X-(playerToMouse.y*flashRange*flashWidth)), INT(bisector.Y+(playerToMouse.x*flashRange*flashWidth))),
+    p2(INT(bisector.X+(playerToMouse.y*flashRange*flashWidth)), INT(bisector.Y-(playerToMouse.x*flashRange*flashWidth)));
+
+    // vertices for the flashlight triangle
+    Gdiplus::Point flashlightVertices[3] = {playerPos, p1, p2};
+
+    // create a GraphicsPath to represent the triangle
+    Gdiplus::GraphicsPath path;
+    path.AddPolygon(flashlightVertices, 3);
+    // create a region from the GraphicsPath
+    Gdiplus::Region region(&path);
+    // create a rectangle representing the entire window
+    Gdiplus::Rect rect(0, 0, wndWidth, wndHeight);
+    // create a region from the rectangle
+    Gdiplus::Region windowRegion(rect);
+
+    Gdiplus::SolidBrush flashlightBrush(Gdiplus::Color(int(255.0f*(1.0f-flashlightBrightness)), 0,0,0));
+    graphics.FillRectangle(&flashlightBrush, rect);
+    
+    // exclude the triangular region from the window region
+    windowRegion.Exclude(&region);
+
+    // cover screen in black
+    Gdiplus::SolidBrush blackBrush(Gdiplus::Color(int(255.0f*(1.0f-ambientLightPercent)), 0, 0, 0));
+    graphics.FillRegion(&blackBrush, &windowRegion);
+}
+
+void shootBullet(int x, int y)
+{
+    // get position in world space
+    Vector2 dest = getWorldSpaceCoords((float)x, (float)y);
+
+    // vector from player to bullet destination
+    dest.x -= player->pos.x+player->size[0]/2;
+    dest.y -= player->pos.y+player->size[1]/2;
+
+    // normalised
+    dest.normalise();
+
+    // instantiate a bullet on the player moving in the direction of dest
+    GameObject * bullet = new GameObject(bulletImg, 0,
+        player->pos.x+player->size[0]/2-10, player->pos.y+player->size[1]/2-10,
+        400.0f, PLAYER_BULLET, 400.0f*dest.x, 400.0f*dest.y);
+    gameObjects.push_back(bullet);
+}
+
+void handleCollisions()
+{
+    for (int i = 0; i < gameObjects.size(); i++)
+    {
+        // other objects collide with walls, not the other way around
+        if (gameObjects[i]->entityType == WALL) continue;
+        // hitbox for gameObjects[i]
+        RECT obj0 = {(LONG)gameObjects[i]->pos.x,                         (LONG)gameObjects[i]->pos.y, 
+                     LONG(gameObjects[i]->pos.x+gameObjects[i]->size[0]), LONG(gameObjects[i]->pos.y+gameObjects[i]->size[1])};
+
+        // when collision is detected: if object is a bullet -> delete obj, if target is not wall or player -> delete target
+
+        for (int j = 0; j < gameObjects.size(); j++)
+        {
+            if (i == j) continue; // object doesn't collide with itself
+            // hitbox for gameObjects[j]
+            RECT obj1 = {(LONG)gameObjects[j]->pos.x,                         (LONG)gameObjects[j]->pos.y, 
+                         LONG(gameObjects[j]->pos.x+gameObjects[j]->size[0]), LONG(gameObjects[j]->pos.y+gameObjects[j]->size[1])};
+
+            // left side of obj0 colliding
+            if (obj0.left<obj1.right && obj0.right>obj1.right) {
+                //   side collision,                                  obj0 bigger than wall side
+                if ((obj0.top>obj1.top && obj0.bottom<obj1.bottom) || (obj0.top<obj1.top && obj0.bottom>obj1.bottom)) {
+                    // if obj0 0 is a bullet
+                    if (gameObjects[i]->entityType == PLAYER_BULLET) {
+                        int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                        if (res == 0) continue;
+                        else break;
+                    } else gameObjects[i]->pos.x = obj1.right;
+                } else {
+                    // overlaps
+                    int dTop    = (obj1.bottom-obj0.top)*(obj0.bottom>obj1.bottom),
+                        dBottom = (obj0.bottom-obj1.top)*(obj0.top<obj1.top),
+                        dLeft   = obj1.right-obj0.left;
+                    if (dTop>0) { // top of obj0 collides with bottom left corner
+                        // if x overlap is greater, the TOP is colliding, move along x axis
+                        if (gameObjects[i]->entityType == PLAYER_BULLET) {
+                            int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                            if (res == 0) continue;
+                            else break;
+                        } else if (dLeft>dTop) gameObjects[i]->pos.y = obj1.bottom;
+                        else gameObjects[i]->pos.x = obj1.right;
+                    } else if (dBottom>0) {
+                        if (gameObjects[i]->entityType == PLAYER_BULLET) {
+                            int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                            if (res == 0) continue;
+                            else break;
+                        } else if (dLeft>dBottom) gameObjects[i]->pos.y = obj1.top-gameObjects[i]->size[1];
+                        else gameObjects[i]->pos.x = obj1.right;
+                    }
+                }
+            } else if (obj0.right>obj1.left && obj0.left<obj1.left) { // right of obj0 colliding
+                if ((obj0.top>obj1.top && obj0.bottom<obj1.bottom) || (obj0.top<obj1.top && obj0.bottom>obj1.bottom)) {
+                    if (gameObjects[i]->entityType == PLAYER_BULLET) {
+                        int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                        if (res == 0) continue;
+                        else break;
+                    } else gameObjects[i]->pos.x = obj1.left-gameObjects[i]->size[0];
+                } else {
+                    // overlaps
+                    int dTop    = (obj1.bottom-obj0.top)*(obj0.bottom>obj1.bottom),
+                        dBottom = (obj0.bottom-obj1.top)*(obj0.top<obj1.top),
+                        dRight  = obj0.right-obj1.left;
+                    if (dTop>0) { // top of obj0 collides with bottom left corner
+                        if (gameObjects[i]->entityType == PLAYER_BULLET) {
+                            int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                            if (res == 0) continue;
+                            else break;
+                        } else if (dRight>dTop) gameObjects[i]->pos.x = obj1.bottom;
+                    } else if (dBottom>0) {
+                        if (gameObjects[i]->entityType == PLAYER_BULLET) {
+                            int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                            if (res == 0) continue;
+                            else break;
+                        } else if (dRight>dBottom) gameObjects[i]->pos.y = obj1.top-gameObjects[i]->size[1];
+                        else gameObjects[i]->pos.x = obj1.left-gameObjects[i]->size[0];
+                    }
+                }
+            } else if (obj0.bottom>obj1.top && obj0.top<obj1.top) { // bottom of obj0 colliding
+                if ((obj0.left>obj1.left&&obj0.right<obj1.right) || (obj0.left<obj1.left&&obj0.right>obj1.right)) {
+                    if (gameObjects[i]->entityType == PLAYER_BULLET) {
+                        int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                        if (res == 0) continue;
+                        else break;
+                    } else gameObjects[i]->pos.y = obj1.top-gameObjects[i]->size[1];
+                } // corner collisions handled in sides
+            } else if (obj0.top<obj1.bottom&&obj0.bottom>obj1.bottom) { // bottom of obj0 colliding
+                if ((obj0.left>obj1.left&&obj0.right<obj1.right) || (obj0.left<obj1.left&&obj0.right>obj1.right)) {
+                    if (gameObjects[i]->entityType == PLAYER_BULLET) {
+                        int res = bulletHit(gameObjects[i], gameObjects[j], &i, &j);
+                        if (res == 0) continue;
+                        else break;
+                    } else gameObjects[i]->pos.y = obj1.bottom;
+                }
+            }
+        }
+    }
+}
+
+int bulletHit(GameObject* obj0, GameObject* obj1, int* i, int* j)
+{
+    // return codes: 0: hit player/other bullet, continue
+    //               1: hit wall, delete self, break
+    //               2: hit enemy, delete self, reduce hp from target, break
+    // obj0->entityType == PLAYER_BULLET
+    if (obj1->entityType==PLAYER_BULLET || obj1->entityType==PLAYER) return 0;
+    if (obj1->entityType==WALL) {
+        // delete self
+        delete obj0;
+        gameObjects.erase(gameObjects.begin() + (*i)--);
+        return 1;
+    } else {
+        // reduce target hp
+        obj1->health -= obj0->health;
+        // delete self
+        delete obj0;
+        gameObjects.erase(gameObjects.begin() + (*i)--);
+        // if target has no more hp, delete
+        if (obj1->health <= 0) {
+            delete obj1;
+            gameObjects.erase(gameObjects.begin() + (*j)--);
+        }
+        return 2;
+    }
 }

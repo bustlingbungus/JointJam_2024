@@ -5,7 +5,10 @@
 // macros
 #define PLAYER 1
 #define PLAYER_BULLET 2
+#define WALL 3
 #define MIN(a,b) (a<b)? a : b
+// typedefs
+typedef unsigned char uint8; // 8 bit unsigned integer
 
 /* 
 REMEMBER TO LINK WITH -lgdi32 and -lgdiplus WHEN COMPILING !!!!!
@@ -33,7 +36,7 @@ REMEMBER TO LINK WITH -lgdi32 and -lgdiplus WHEN COMPILING !!!!!
 // stores x and y dimensions as floats
 struct Vector2{
     float x = 0.0f;
-    float y = 0.0f;
+    float y = 1.0f;
 
     // functions
     float length() { // ||v|| = sqrt(x^2 + y^2)
@@ -48,6 +51,7 @@ struct Vector2{
 
 // information about a game object
 struct GameObject{
+    // bullets wont have health, so hp can be used to identify how much damage a bullet does
     int health;
     Vector2 pos;
     Vector2 velocity = {0.0f, 0.0f};
@@ -66,6 +70,16 @@ struct GameObject{
         pos.x = x; pos.y = y;
         moveSpeed = speed;
         entityType = type;
+    }
+
+    GameObject(Gdiplus::Image * image, int hp, float x, float y, float speed, int type, float velX, float velY) {
+        img = image;
+        size[0] = 20; size[1] = 20;
+        health = hp;
+        pos.x = x; pos.y = y;
+        moveSpeed = speed;
+        entityType = type;
+        velocity.x = velX; velocity.y = velY;
     }
 };
 
@@ -87,12 +101,17 @@ float DeltaTime(); // time elapsed between frames
 // drawing
 void drawGameObject(GameObject * obj, Gdiplus::Graphics * graphics);
 void drawBackgroundSection(Gdiplus::Graphics& graphics, Gdiplus::Image* image);
+void illuminateFlashLight(Gdiplus::Graphics& graphics);
 
 // game objects
+void shootBullet(int x, int y);
 void updateVelocities();
 void updatePositions();
 void updateGameObjects();
 void deallocateGameObjects();
+
+void handleCollisions();
+int bulletHit(GameObject* obj0, GameObject* obj1, int* i, int* j);
 
 // conversions/logic
 Vector2 getWorldSpaceCoords(float x, float y); // converts from window coordinates to corridinates in game

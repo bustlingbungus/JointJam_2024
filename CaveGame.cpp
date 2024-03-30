@@ -4,6 +4,8 @@
 int wndWidth, wndHeight; // dimensions of window
 float deltaTime = 0.0f, // time elapsed between frames
 fixedDeltaTime = 16.0f; // 60fps
+float flashRange = 300.0f; // range of the flashlight
+float ambientLightPercent = 0.1f; // 0 to 1, how bright the scene is without flashlight
 
 // gdiplus
 Gdiplus::Image * background;
@@ -102,12 +104,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
 
         case WM_PAINT: { // called continuously
-            // update window dimensions
-            RECT clientRect;
-            GetClientRect(hwnd, &clientRect);
-            wndWidth  = clientRect.right  - clientRect.left;
-            wndHeight = clientRect.bottom - clientRect.top; 
-
             createBufferFrame(hwnd);
             // copy buffer frame to visible window
             copyOffscreenToWindow(g_hdc);
@@ -202,7 +198,22 @@ void copyOffscreenToWindow(HDC hdc)
 
 void createBufferFrame(HWND hwnd)
 {
+    // update window dimensions
+    RECT clientRect;
+    GetClientRect(hwnd, &clientRect);
+    wndWidth  = clientRect.right  - clientRect.left;
+    wndHeight = clientRect.bottom - clientRect.top; 
+
     Gdiplus::Graphics graphics(hOffscreenDC); // graphics object for drawing
+
+    // define vertices for triangle
+    Gdiplus::Point playerPos = getScreenCoords(player->pos.x+(player->size[0]/2), player->pos.y+(player->size[1]/2));
+    Gdiplus::Point bisector(INT(playerPos.X+(flashRange*playerToMouse.x)), INT(playerPos.Y+(flashRange*playerToMouse.y)));
+    Gdiplus::Point p1(INT(bisector.X-(playerToMouse.y*flashRange/2)), INT(bisector.Y+(playerToMouse.x*flashRange/2)));
+    Gdiplus::Point p2(INT(bisector.X+(playerToMouse.y*flashRange/2)), INT(bisector.Y-(playerToMouse.x*flashRange/2)));
+
+    // vertices for the flashlight triangle
+    Gdiplus::Point flashlightVertices[3] = {playerPos, p1, p2};
 
     // draw background
     drawBackgroundSection(graphics, background);
@@ -212,12 +223,23 @@ void createBufferFrame(HWND hwnd)
         drawGameObject(gameObjects[i], &graphics);
     }
 
-    POINT playerPos = getScreenCoords(player->pos.x, player->pos.y);
-    POINT flashlightVertices[3] = { // vertices for the flashlight triangle
-        playerPos,
+    // create a GraphicsPath to represent the triangle
+    Gdiplus::GraphicsPath path;
+    path.AddPolygon(flashlightVertices, 3);
+    // create a region from the GraphicsPath
+    Gdiplus::Region region(&path);
+    // create a rectangle representing the entire window
+    Gdiplus::Rect rect(0, 0, wndWidth, wndHeight);
+    // create a region from the rectangle
+    Gdiplus::Region windowRegion(rect);
+    
+    // exclude the triangular region from the window region
+    windowRegion.Exclude(&region);
 
-    };
 
+    // cover screen in black
+    Gdiplus::SolidBrush blackBrush(Gdiplus::Color(int(255.0f*(1.0f-ambientLightPercent)), 0, 0, 0));
+    graphics.FillRegion(&blackBrush, &windowRegion);
 
     // deallocate resources
 }
@@ -330,7 +352,7 @@ Vector2 getWorldSpaceCoords(float x, float y)
 }
 
 // finds the on screen coordinates of a world space coordinate
-POINT getScreenCoords(float x, float y)
+Gdiplus::Point getScreenCoords(float x, float y)
 {
     int width = wndWidth/2, height = wndHeight/2; // half the width and height
 
@@ -342,5 +364,5 @@ POINT getScreenCoords(float x, float y)
     else if (player->pos.y > bkgHeight-height) y -= bkgHeight-wndHeight;
     else y -= player->pos.y-height;
 
-    return POINT {(int)x, (int)y};
+    return Gdiplus::Point((INT)x, (INT)y);
 }

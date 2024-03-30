@@ -96,4 +96,4 @@ void deallocateGameObjects();
 
 // conversions/logic
 Vector2 getWorldSpaceCoords(float x, float y); // converts from window coordinates to corridinates in game
-POINT getScreenCoords(float x, float y);
+Gdiplus::Point getScreenCoords(float x, float y);

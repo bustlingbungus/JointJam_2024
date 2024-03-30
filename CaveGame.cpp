@@ -80,7 +80,7 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
     ShowWindow(hwnd, nCmdShow); // open the game window
 
     // place a wall in the map
-    GameObject * wall = new GameObject(Wall0Img, 100, 100.0f, 100.0f, 0.0f, WALL);
+    GameObject * wall = new GameObject(Wall0Img, 100, 100.0f, 100.0f, 0.0f, WALL, 600, 300);
     gameObjects.push_back(wall);
 
     // main message loop
@@ -294,6 +294,10 @@ void updateVelocities()
 
             case PLAYER_BULLET: break; // constant velocity, no need to update
 
+            case WALL:
+                gameObjects[i]->velocity.x = 0.0f; gameObjects[i]->velocity.y = 0.0f;
+                break;
+
             default: std::cout << "unknown entity: " << i << '\n'; break;
         }
     }
@@ -313,6 +317,7 @@ void updateGameObjects()
     if (gameIsPaused) return;
     updateVelocities();
     updatePositions();
+    handleCollisions();
 }
 
 void drawBackgroundSection(Gdiplus::Graphics& graphics, Gdiplus::Image* image)
@@ -444,6 +449,7 @@ void handleCollisions()
 
         for (int j = 0; j < gameObjects.size(); j++)
         {
+            //std::cout << i <<' '<< j <<'\n';
             if (i == j) continue; // object doesn't collide with itself
             // hitbox for gameObjects[j]
             RECT obj1 = {(LONG)gameObjects[j]->pos.x,                         (LONG)gameObjects[j]->pos.y, 

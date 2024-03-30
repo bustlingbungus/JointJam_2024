@@ -81,6 +81,15 @@ struct GameObject{
         entityType = type;
         velocity.x = velX; velocity.y = velY;
     }
+
+    GameObject(Gdiplus::Image * image, int hp, float x, float y, float speed, int type, int sizeX, int sizeY) {
+        img = image;
+        size[0] = sizeX; size[1] = sizeY;
+        health = hp;
+        pos.x = x; pos.y = y;
+        moveSpeed = speed;
+        entityType = type;
+    }
 };
 
 // windows

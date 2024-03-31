@@ -336,7 +336,17 @@ void updateVelocities()
 
             case PLAYER_BULLET: break; // constant velocity, no need to update
 
-            case ENEMY: break;
+            case ENEMY:
+                if(not gameObjects[i]->idle){
+                    std::cout << "enemy is not idle at obj position: " << i << std::endl;
+                    int delta_x = (player->pos.x) - gameObjects[i]->pos.x;
+                    int delta_y = (player->pos.y) - gameObjects[i]->pos.y;
+
+                    gameObjects[i]->velocity.x = (delta_x/10) * gameObjects[i]->moveSpeed;
+                    gameObjects[i]->velocity.y = (delta_y/10) * gameObjects[i]->moveSpeed;
+                    break;
+                }
+                break;
 
             // static objects, shouldnt move
             case WALL:    break;
@@ -360,6 +370,7 @@ void updatePositions()
 void updateGameObjects()
 {
     if (gameIsPaused) return;
+    checkidle();
     updateVelocities();
     updatePositions();
     handleCollisions();
@@ -633,6 +644,37 @@ int bulletHit(GameObject* obj0, GameObject* obj1, int* i, int* j)
     }
 }
 
+void checkidle(){
+    for (int i; i < gameObjects.size(); i++){
+        if(gameObjects[i]->entityType == ENEMY){
+            int delta_x = (player->pos.x) - gameObjects[i]->pos.x;
+            int delta_y = (player->pos.y) - gameObjects[i]->pos.y;
+
+            float dist = sqrt(delta_x^2 + delta_y^2);
+
+            if(dist <= 10){
+                gameObjects[i]->idle = false;
+                float slope = delta_y/delta_x;
+
+                for(int j = player->pos.x; j < gameObjects[i]->pos.x; j++){
+                    int y_pos = (slope*j) + player->pos.x;
+
+                    for(int k = 0; k < gameObjects.size(); k++){
+                        if(gameObjects[k]->entityType == WALL){
+                            GameObject* temp = gameObjects[k];
+                            int l0 = temp->pos.x,      t0 = temp->pos.y,
+                                r0 = l0+temp->size[0], b0 = t0+temp->size[1];
+                            if(j>l0 && j<r0 && y_pos<t0 && y_pos>b0) {
+                                gameObjects[i]->idle = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void placeWalls()
 {
     // BOUNDING WALLS
@@ -737,33 +779,17 @@ void generateEnemies(int n){
             enemy_y = test_y;
 
             //Compare these values with the positions of walls
-            for (auto i: interiorWalls) {
-                Vector2* pos = i.first;
-                float scale = i.second;
+            for (int i; i < gameObjects.size(); i++) {
+                GameObject* temp = gameObjects[i];
 
-                //check the right edge of the wall and the left edge of the enemy are inside eachother as well as
-                //if the top edge of the wall and the bottom edge of the enemy are touching
-                if(((pos->x) + (scale)) >= test_x - 30 && ((pos->y) + (scale) >= test_y - 30)){
-                    repeat = true;
-                    break;
-                }
+                if(temp->entityType == WALL) {
+                    int l0 = temp->pos.x, t0 = temp->pos.y,
+                        r0 = l0 + temp->size[0], b0 = t0 + temp->size[1];
 
-                //does above but checks for the bottom edge of the enemy and top edge of the wall
-                if(((pos->x) + (scale)) >= test_x - 30 && ((pos->y) - (scale) <= test_y + 30)){
-                    repeat = true;
-                    break;
-                }
-
-                //check if the left edge of the wall and the right edge of the enemy etc...
-                if(((pos->x) - (scale)) >= test_x + 30 && ((pos->y) + (scale) >= test_y - 30)){
-                    repeat = true;
-                    break;
-                }
-
-                //does above but checks for the bottom edge of the enemy and the top edge of the wall
-                if(((pos->x) - (scale)) >= test_x + 30 && ((pos->y) - (scale) >= test_y + 30)){
-                    repeat = true;
-                    break;
+                    if (enemy_x>l0 && enemy_x<r0 && enemy_y<t0 && enemy_y>b0) {
+                        repeat = true;
+                        break;
+                    }
                 }
             }
 
@@ -771,8 +797,7 @@ void generateEnemies(int n){
                 isinwall = false;
             }
         }
-
-        GameObject* enemy = new GameObject(enemyImg, 100, enemy_x, enemy_y, 0.0f, ENEMY);
+        GameObject* enemy = new GameObject(enemyImg, 100, enemy_x, enemy_y, 5.0f, ENEMY);
         gameObjects.push_back(enemy);
     }
 }

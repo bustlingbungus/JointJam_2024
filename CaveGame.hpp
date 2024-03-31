@@ -82,6 +82,7 @@ struct GameObject{
     Vector2 velocity = {0.0f, 0.0f};
     float moveSpeed;
     int entityType;
+    bool idle;
 
     // rendering
     Gdiplus::Image * img;
@@ -154,6 +155,7 @@ void drainLight();
 
 void handleCollisions();
 int bulletHit(GameObject* obj0, GameObject* obj1, int* i, int* j);
+void checkidle();
 void pickUpItem(GameObject* obj0, GameObject* obj1, int* j);
 
 // conversions/logic

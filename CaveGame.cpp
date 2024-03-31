@@ -4,15 +4,16 @@
 int wndWidth, wndHeight; // dimensions of window
 float deltaTime = 0.0f, // time elapsed between frames
 fixedDeltaTime = 16.0f; // 60fps
-float timer = 0.1f; // time spent in the cave
+float timer = 0.0f; // time spent in the cave
 bool gameIsPaused = 0, flashlightOn = 0;
+int pauseState = PAUSE;
 // flashlight
-float flashRange = 300.0f, flashWidth = 0.5f; // range of the flashlight
+float flashRange, flashWidth; // range of the flashlight
 float ambientLightPercent = 1.0f, flashlightBrightness = 1.0f; // 0 to 1, how bright the scene/flashlight are
 // player inventory
-unsigned int numBullets = 20;
-float maxCharge = 20.0f, flashLightCharge = maxCharge;
-unsigned int numGems = 0;
+unsigned int initialBullets, numBullets;
+float maxCharge, flashLightCharge;
+unsigned int gemsSaved, numGems;
 
 // gdiplus
 Gdiplus::Image * background;
@@ -52,6 +53,8 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
 
     HBRUSH bkg = CreateSolidBrush(RGB(255,255,255)); // window background color, white
 
+    // load global variables
+    loadGlobals();
     loadImages();
 
     // register window class
@@ -94,7 +97,11 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
         deltaTime = DeltaTime();
 
         // win condition
-        if (roomQueue.empty()) std::cout << "you win!\n";
+        if (roomQueue.empty()) {
+            gemsSaved += numGems; numGems = 0;
+            gameIsPaused = true;
+            pauseState = VICTORY;
+        } else pauseState = PAUSE;
 
         updateGameObjects();
 
@@ -146,7 +153,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 case 0x44: // d
                     movementKeys |= 1; break;
                 case VK_ESCAPE:
-                    gameIsPaused = !gameIsPaused;
+                    if (!roomQueue.empty()) gameIsPaused = !gameIsPaused;
             }
             break;
 
@@ -170,6 +177,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             // shoot a bullet
             if (!gameIsPaused) shootBullet(x, y);
+            else interactWithPauseMenu(x, y, hwnd);
             break;
         }
         case WM_RBUTTONDOWN:
@@ -198,6 +206,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             // deallocate other resources
             gameObjects.clear();
             delete background;
+
+            // save globals to local storage
+            saveGlobals();
 
             PostQuitMessage(0);
             break;
@@ -254,19 +265,21 @@ void createBufferFrame(HWND hwnd)
     // flashlight
     illuminateFlashLight(graphics);
 
-    if (gameIsPaused) {
-        Gdiplus::Rect rect(0, 0, wndWidth, wndHeight);
-        Gdiplus::SolidBrush pauseBrush(Gdiplus::Color(150, 0,0,0));
-        graphics.FillRectangle(&pauseBrush, rect);
-    }
-
     // UI text
     std::wstring flashText = L"Flashlight Charge: "+
         std::to_wstring((int)flashLightCharge)+L'.'+
         std::to_wstring(int((flashLightCharge-(int)flashLightCharge)*100))+L's';
-    placeText(10, 10, L"Bullets: " + std::to_wstring(numBullets), graphics);
-    placeText(10, 30, flashText, graphics);
-    placeText(10, 50, L"Gems: "+std::to_wstring(numGems), graphics);
+    placeText(10, 10, L"Bullets: " + std::to_wstring(numBullets), Gdiplus::Color(255,255,255), 12, graphics);
+    placeText(10, 30, flashText, Gdiplus::Color(255,255,255), 12, graphics);
+    placeText(10, 50, L"Gems: "+std::to_wstring(numGems), Gdiplus::Color(255,255,255), 12, graphics);
+
+    if (gameIsPaused) {
+        Gdiplus::Rect rect(0, 0, wndWidth, wndHeight);
+        Gdiplus::SolidBrush pauseBrush(Gdiplus::Color(150, 0,0,0));
+        graphics.FillRectangle(&pauseBrush, rect);
+
+        drawPauseMenuUI(graphics, PAUSE);
+    }
 
     // deallocate resources
 }
@@ -303,6 +316,13 @@ void drawGameObject(GameObject * obj, Gdiplus::Graphics * graphics)
 void updateVelocities()
 {
     for (int i = 0; i < gameObjects.size(); i++) {
+        // kill entities with no health left
+        if (gameObjects[i]->health <= 0) {
+            delete gameObjects[i];
+            gameObjects.erase(gameObjects.begin() + i--);
+        }
+
+
         switch (gameObjects[i]->entityType)
         {
             case PLAYER:
@@ -446,7 +466,7 @@ void shootBullet(int x, int y)
     dest.normalise();
 
     // instantiate a bullet on the player moving in the direction of dest
-    GameObject * bullet = new GameObject(bulletImg, 0,
+    GameObject * bullet = new GameObject(bulletImg, 1,
         player->pos.x+player->size[0]/2-10, player->pos.y+player->size[1]/2-10,
         400.0f, PLAYER_BULLET, 400.0f*dest.x, 400.0f*dest.y);
     gameObjects.push_back(bullet);
@@ -647,12 +667,12 @@ void placeWalls()
     }
 }
 
-void placeText(int x, int y, std::wstring text, Gdiplus::Graphics& graphics)
+void placeText(int x, int y, std::wstring text, Gdiplus::Color color, int size, Gdiplus::Graphics& graphics)
 {
     // create a font
-    Gdiplus::Font font(L"Arial", 12);
+    Gdiplus::Font font(L"Arial", size);
     // create a brush for text color
-    Gdiplus::SolidBrush brush(Gdiplus::Color(255,255,255)); // white text
+    Gdiplus::SolidBrush brush(color);
     
     graphics.DrawString(text.c_str(), -1, &font, Gdiplus::PointF(x, y), &brush);
 }
@@ -665,9 +685,8 @@ void drainLight()
     float t = 1 - 1.0f*inerpolationCharge/maxCharge; t *= t*t*t*t; // f(t) = t^5
     flashlightBrightness = (1-t) + (ambientLightPercent * t);
 
-    float num = MIN(timer, 0.5f);
-    ambientLightPercent = num / timer;
-    if (timer > 1.0f) ambientLightPercent /= timer;
+    ambientLightPercent = 0.5f / (float)roomQueue.size();
+    if (roomQueue.size() >= 3 ) ambientLightPercent /= float(roomQueue.size()/3);
 }
 
 std::unordered_map<Vector2*, float> generateWalls()
@@ -783,4 +802,143 @@ void generateRoom(Vector2 playerPos)
 
     placeItems();
     placeWalls();
+}
+
+int loadGlobals()
+{
+    // txt file, tab separated:
+    // flashRange   flashWidth  initialBullets  initialCharge   gemsSaved
+
+    FILE* file;
+    file = fopen("playerData.txt", "r");
+    if (!file) return -1;
+
+    // read in data
+    fscanf(file, "%f\t%f\t%d\t%f\t%d", 
+        &flashRange, &flashWidth,
+        &initialBullets, &maxCharge, &gemsSaved);
+
+    // set globals
+    numBullets = initialBullets;
+    flashLightCharge = maxCharge;
+
+    fclose(file);
+    return 0;
+}
+
+int saveGlobals()
+{
+    FILE* file;
+    file = fopen("playerData.txt", "w");
+    if (!file) return -1;
+
+    // write data
+    fprintf(file, "%f\t%f\t%d\t%f\t%d",
+        flashRange, flashWidth, 
+        initialBullets, maxCharge, gemsSaved);
+
+    fclose(file);
+    return 0;
+}
+
+void drawPauseMenuUI(Gdiplus::Graphics& graphics, int state)
+{
+    std::wstring text;
+    // main text
+    if (state == PAUSE) {
+        text = L"Game is Paused";
+        placeText(wndWidth/2-160, wndHeight/8, text, Gdiplus::Color(255,255,255), 30, graphics);
+    } else if (state == VICTORY) {
+        text = L"Success!";
+        placeText(wndWidth/2-100, wndHeight/8, text, Gdiplus::Color(255,255,255), 30, graphics);
+    }
+
+    // flashlight range
+    text = L"Flashlight Range: "+
+        std::to_wstring((int)flashRange)+L'.'+
+        std::to_wstring(int((flashRange-(int)flashRange)*100));
+    placeText(25, wndHeight/2, text, Gdiplus::Color(255,255,255), 12, graphics);
+
+    // flashlight width
+    text = L"Flashlight Width: "+
+        std::to_wstring((int)flashWidth)+L'.'+
+        std::to_wstring(int((flashWidth-(int)flashWidth)*100));
+    placeText(25+(wndWidth/4), wndHeight/2, text, Gdiplus::Color(255,255,255), 12, graphics);
+
+    // starting bullets
+    text = L"Starting Bullets: "+std::to_wstring(initialBullets);
+    placeText(25+(wndWidth/2), wndHeight/2, text, Gdiplus::Color(255,255,255), 12, graphics);
+
+    // starting charge
+    text = L"Starting charge: "+
+        std::to_wstring((int)maxCharge)+L'.'+
+        std::to_wstring(int((maxCharge-(int)maxCharge)*100))+L's';
+    placeText(25+(3*wndWidth/4), wndHeight/2, text, Gdiplus::Color(255,255,255), 12, graphics);
+
+    text = L"Click on a stat to improve it for 10 gems!";
+    placeText(wndWidth/2-150, wndHeight/4, text, Gdiplus::Color(255,255,255), 12, graphics);
+    text = L"Available gems: "+std::to_wstring(gemsSaved);
+    placeText(wndWidth/2-70, wndHeight/4+30, text, Gdiplus::Color(255,255,255), 12, graphics);
+
+    // draw buttons
+    // reset
+    RECT rect = {25, 3*wndHeight/4-30, wndWidth-25, 3*wndHeight/4+20};
+    HBRUSH buttonBrush = CreateSolidBrush(RGB(180,180,180));
+    FillRect(hOffscreenDC, &rect, buttonBrush);
+
+    text = L"New Game";
+    placeText(wndWidth/2-70, rect.top+10, text, Gdiplus::Color(0,0,0), 20, graphics);
+
+    // exit
+    rect = {25, 3*wndHeight/4+50, wndWidth-25, 3*wndHeight/4+100};
+    FillRect(hOffscreenDC, &rect, buttonBrush);
+
+    text = L"Exit Game";
+    placeText(wndWidth/2-70, rect.top+10, text, Gdiplus::Color(0,0,0), 20, graphics);
+
+    // deallocate resources
+    DeleteObject(buttonBrush);
+}
+
+void interactWithPauseMenu(int x, int y, HWND hwnd)
+{
+    if (x>25&&x<wndWidth-25) {
+        if (y>(wndHeight/4+30)&&y<(3*wndHeight/4)-30) {
+            if (x<25+(wndWidth/4)) { // range increase
+                improveStat(RANGE);
+            } else if (x<25+(wndWidth/2)) { // width
+                improveStat(WIDTH);
+            } else if (x<25+(3*wndWidth/4)) { // bullets
+                improveStat(BULLET_COUNT);
+            } else { // charge
+                improveStat(CHARGE);
+            }
+        } else if (y>3*wndHeight/4-30 && y<3*wndHeight/4+20) { // reset button
+            // clear queue
+            while (!roomQueue.empty()) roomQueue.pop();
+            // reset inventory
+            numBullets = initialBullets;
+            flashLightCharge = maxCharge; flashlightOn = 0;
+            numGems = 0;
+            // reset game
+            roomQueue.push(LEFT);
+            generateRoom(Vector2 {150.0f, (float)bkgHeight/2.0f});
+            gameIsPaused = false;
+        } else if (y>3*wndHeight/4+50 && y<3*wndHeight/4+100) { // exit button
+            SendMessage(hwnd, WM_CLOSE, 0, 0); // close the window
+        }
+    }
+}
+
+void improveStat(int stat)
+{
+    if (gemsSaved < 10) return;
+    gemsSaved -= 10;
+    switch (stat)
+    {
+        case WIDTH: flashWidth += 0.01f; break;
+        case RANGE: flashRange += 1.0f; break;
+        case BULLET_COUNT: initialBullets++; break;
+        case CHARGE: maxCharge += 1.0f; break;
+    }
 }

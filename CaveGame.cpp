@@ -278,7 +278,7 @@ void createBufferFrame(HWND hwnd)
         Gdiplus::SolidBrush pauseBrush(Gdiplus::Color(150, 0,0,0));
         graphics.FillRectangle(&pauseBrush, rect);
 
-        drawPauseMenuUI(graphics, PAUSE);
+        drawPauseMenuUI(graphics, pauseState);
     }
 
     // deallocate resources

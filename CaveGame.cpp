@@ -337,8 +337,7 @@ void updateVelocities()
             case PLAYER_BULLET: break; // constant velocity, no need to update
 
             case ENEMY:
-                if(not gameObjects[i]->idle){
-                    std::cout << "enemy is not idle at obj position: " << i << std::endl;
+                if(gameObjects[i]->idle == false){
                     int delta_x = (player->pos.x) - gameObjects[i]->pos.x;
                     int delta_y = (player->pos.y) - gameObjects[i]->pos.y;
 
@@ -539,6 +538,11 @@ void handleCollisions()
                         if (res == 0) continue;
                         else break;
                     } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
+                    //NEW FOR ENEMY
+                    if (obj0->entityType == ENEMY && obj1->entityType == PLAYER){
+                        player->health -= 1;
+                        std::cout << player->health << std::endl;
+                    }
                     else obj0->pos.x = r1;
                 } else {
                     int dTop    = (b1-t0)*(b0>b1),
@@ -569,6 +573,11 @@ void handleCollisions()
                         if (res == 0) continue;
                         else break;
                     } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
+                    //NEW FOR ENEMY
+                    if (obj0->entityType == ENEMY && obj1->entityType == PLAYER){
+                        player->health -= 1;
+                        std::cout << player->health << std::endl;
+                    }
                     else obj0->pos.x = l1-obj0->size[0];
                 } else {
                     int dTop    = (b1-t0)*(b0>b1),
@@ -599,6 +608,11 @@ void handleCollisions()
                         if (res == 0) continue;
                         else break;
                     } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
+                    //NEW FOR ENEMY
+                    if (obj0->entityType == ENEMY && obj1->entityType == PLAYER){
+                        player->health -= 1;
+                        std::cout << player->health << std::endl;
+                    }
                     else obj0->pos.y = t1-obj0->size[1];
                 }
             } else if (t0<b1&&b0>b1) {
@@ -608,11 +622,15 @@ void handleCollisions()
                         if (res == 0) continue;
                         else break;
                     } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
+                    //NEW FOR ENEMY
+                    if (obj0->entityType == ENEMY && obj1->entityType == PLAYER){
+                        player->health -= 1;
+                        std::cout << player->health << std::endl;
+                    }
                     else obj0->pos.y = b1;
                 }
             }
         }
-
     }
 }
 
@@ -645,28 +663,40 @@ int bulletHit(GameObject* obj0, GameObject* obj1, int* i, int* j)
 }
 
 void checkidle(){
-    for (int i; i < gameObjects.size(); i++){
+    for (int i = 0; i < gameObjects.size(); i++){
         if(gameObjects[i]->entityType == ENEMY){
             int delta_x = (player->pos.x) - gameObjects[i]->pos.x;
             int delta_y = (player->pos.y) - gameObjects[i]->pos.y;
 
-            float dist = sqrt(delta_x^2 + delta_y^2);
+            float dist = sqrt((abs(delta_x))^2 + (abs(delta_y)^2));
 
-            if(dist <= 10){
+            if(dist <= 20){
                 gameObjects[i]->idle = false;
-                float slope = delta_y/delta_x;
+                if(delta_x == 0){
+                    break;
+                }
+                else {
+                    float slope = (delta_y) / (delta_x);
+                    std::cout << "current slope: " << slope << std::endl;
 
-                for(int j = player->pos.x; j < gameObjects[i]->pos.x; j++){
-                    int y_pos = (slope*j) + player->pos.x;
 
-                    for(int k = 0; k < gameObjects.size(); k++){
-                        if(gameObjects[k]->entityType == WALL){
-                            GameObject* temp = gameObjects[k];
-                            int l0 = temp->pos.x,      t0 = temp->pos.y,
-                                r0 = l0+temp->size[0], b0 = t0+temp->size[1];
-                            if(j>l0 && j<r0 && y_pos<t0 && y_pos>b0) {
-                                gameObjects[i]->idle = true;
+                    for(int j = player->pos.x; j < gameObjects[i]->pos.x; j++){
+                        int y_pos = (slope*j) + player->pos.x;
+
+                        //supposed to start idleness if there is a wall in the way but...
+                        for(int k = 0; k < gameObjects.size(); k++){
+                            if(gameObjects[k]->entityType == WALL){
+                                GameObject* temp = gameObjects[k];
+                                int l0 = temp->pos.x,      t0 = temp->pos.y,
+                                    r0 = l0+temp->size[0], b0 = t0+temp->size[1];
+                                if(j>l0 && j<r0 && y_pos<t0 && y_pos>b0) {
+                                    gameObjects[i]->idle = true;
+                                    break;
+                                }
                             }
+                        }
+                        if(gameObjects[i]->idle){
+                            break;
                         }
                     }
                 }
@@ -797,7 +827,7 @@ void generateEnemies(int n){
                 isinwall = false;
             }
         }
-        GameObject* enemy = new GameObject(enemyImg, 100, enemy_x, enemy_y, 5.0f, ENEMY);
+        GameObject* enemy = new GameObject(enemyImg, 5, enemy_x, enemy_y, 5.0f, ENEMY);
         gameObjects.push_back(enemy);
     }
 }

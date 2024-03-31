@@ -82,7 +82,7 @@ struct GameObject{
     Vector2 velocity = {0.0f, 0.0f};
     float moveSpeed;
     int entityType;
-    bool idle;
+    bool idle = true;
 
     // rendering
     Gdiplus::Image * img;

@@ -10,6 +10,11 @@
 #define GEM 5
 #define AMMO 6
 
+#define LEFT 1
+#define RIGHT 2
+#define UP 3
+#define DOWN 4
+
 #define MIN(a,b) (a<b)? a : b
 #define MAX(a,b) (a>b)? a : b
 // typedefs
@@ -33,6 +38,7 @@ REMEMBER TO LINK WITH -lgdi32 and -lgdiplus WHEN COMPILING !!!!!
 
 // std
 #include <iostream>
+#include <stack>
 #include <vector>
 #include <string>
 #include <unordered_map>

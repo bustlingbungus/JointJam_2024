@@ -33,6 +33,8 @@ Vector2 playerToMouse = {1,0};
 
 // for functions
 clock_t begin_time = clock(); // for tracking deltaTime
+// queue traking player movements
+std::stack<int> roomQueue; // entries = direction they need to move
 
 // windows
 HBITMAP hOffscreenBitmap; // buffer frame not seen by user
@@ -77,7 +79,8 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
     );
     if (hwnd == NULL) return 1; // validate window creation
 
-    generateRoom(Vector2 {(float)bkgWidth/2.0f, (float)bkgHeight/2.0f});
+    roomQueue.push(LEFT); // initialise roomQueue
+    generateRoom(Vector2 {150.0f, (float)bkgHeight/2.0f});
 
     ShowWindow(hwnd, nCmdShow); // open the game window
 
@@ -89,6 +92,9 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
 
         // find time elapsed between frames
         deltaTime = DeltaTime();
+
+        // win condition
+        if (roomQueue.empty()) std::cout << "you win!\n";
 
         updateGameObjects();
 
@@ -453,13 +459,25 @@ void handleCollisions()
         // check if player is in load zone
         if (gameObjects[i]==player) {
             if (player->pos.x > bkgWidth) { // right load zone
-                generateRoom(Vector2 {5.0f, player->pos.y}); break;
+                if (roomQueue.top()==RIGHT) roomQueue.pop();
+                else roomQueue.push(LEFT); 
+                generateRoom(Vector2 {5.0f, player->pos.y}); 
+                break;
             } else if (player->pos.y > bkgHeight) { // bottom load zone
-                generateRoom(Vector2 {player->pos.x, 5.0f}); break;
+                if (roomQueue.top()==DOWN) roomQueue.pop();
+                else roomQueue.push(UP);
+                generateRoom(Vector2 {player->pos.x, 5.0f}); 
+                break;
             } else if (player->pos.x < -player->size[0]) { // left load zone
-                generateRoom(Vector2 {bkgWidth-player->size[0]-5.0f, player->pos.y}); break;
+                if (roomQueue.top()==LEFT) roomQueue.pop();
+                else roomQueue.push(RIGHT);
+                generateRoom(Vector2 {bkgWidth-player->size[0]-5.0f, player->pos.y}); 
+                break;
             } else if (player->pos.y < -player->size[1]) { // top load zone
-                generateRoom(Vector2 {player->pos.x, bkgHeight-player->size[1]-5.0f}); break;
+                if (roomQueue.top()==UP) roomQueue.pop();
+                else roomQueue.push(4); 
+                generateRoom(Vector2 {player->pos.x, bkgHeight-player->size[1]-5.0f}); 
+                break;
             }
         }
 
@@ -760,7 +778,7 @@ void generateRoom(Vector2 playerPos)
     gameObjects.clear(); // delete existing game objects
     // instantiate player object
     player = new GameObject(playerImg,
-        10, playerPos.x, playerPos.y, 200.0f, PLAYER);
+    10, playerPos.x, playerPos.y, 200.0f, PLAYER);
     gameObjects.push_back(player);
 
     placeItems();

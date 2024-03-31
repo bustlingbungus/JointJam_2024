@@ -9,6 +9,7 @@
 #define BATTERY 4
 #define GEM 5
 #define AMMO 6
+#define ENEMY 7
 
 #define LEFT 1
 #define RIGHT 2
@@ -142,6 +143,7 @@ void drawPauseMenuUI(Gdiplus::Graphics& graphics, int state);
 
 // game objects
 void shootBullet(int x, int y);
+void generateEnemies(int n);
 void updateVelocities();
 void updatePositions();
 void updateGameObjects();

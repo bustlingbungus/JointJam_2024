@@ -11,9 +11,11 @@ int pauseState = PAUSE;
 float flashRange, flashWidth; // range of the flashlight
 float ambientLightPercent = 1.0f, flashlightBrightness = 1.0f; // 0 to 1, how bright the scene/flashlight are
 // player inventory
-unsigned int initialBullets, numBullets;
+unsigned int initialBullets;
 float maxCharge, flashLightCharge;
 unsigned int gemsSaved, numGems;
+unsigned int numBullets = 20;
+unsigned int numEnemies = 5;
 
 // gdiplus
 Gdiplus::Image * background;
@@ -23,6 +25,7 @@ Gdiplus::Image * batteryImg;
 Gdiplus::Image * gem0Img;
 Gdiplus::Image * ammoImg;
 Gdiplus::Image * playerImg;
+Gdiplus::Image * enemyImg;
 int bkgWidth, bkgHeight;
 
 // game objects
@@ -330,14 +333,16 @@ void updateVelocities()
                 player->velocity.y = player->moveSpeed * (bool(movementKeys&2) - bool(movementKeys&8));
                 break;
 
+
             case PLAYER_BULLET: break; // constant velocity, no need to update
+
+            case ENEMY: break;
 
             // static objects, shouldnt move
             case WALL:    break;
             case BATTERY: break;
             case GEM:     break;
             case AMMO:    break;
-
             default: std::cout << "unknown entity: " << i << '\n'; break;
         }
     }
@@ -480,23 +485,23 @@ void handleCollisions()
         if (gameObjects[i]==player) {
             if (player->pos.x > bkgWidth) { // right load zone
                 if (roomQueue.top()==RIGHT) roomQueue.pop();
-                else roomQueue.push(LEFT); 
-                generateRoom(Vector2 {5.0f, player->pos.y}); 
+                else roomQueue.push(LEFT);
+                generateRoom(Vector2 {5.0f, player->pos.y});
                 break;
             } else if (player->pos.y > bkgHeight) { // bottom load zone
                 if (roomQueue.top()==DOWN) roomQueue.pop();
                 else roomQueue.push(UP);
-                generateRoom(Vector2 {player->pos.x, 5.0f}); 
+                generateRoom(Vector2 {player->pos.x, 5.0f});
                 break;
             } else if (player->pos.x < -player->size[0]) { // left load zone
                 if (roomQueue.top()==LEFT) roomQueue.pop();
                 else roomQueue.push(RIGHT);
-                generateRoom(Vector2 {bkgWidth-player->size[0]-5.0f, player->pos.y}); 
+                generateRoom(Vector2 {bkgWidth-player->size[0]-5.0f, player->pos.y});
                 break;
             } else if (player->pos.y < -player->size[1]) { // top load zone
                 if (roomQueue.top()==UP) roomQueue.pop();
-                else roomQueue.push(4); 
-                generateRoom(Vector2 {player->pos.x, bkgHeight-player->size[1]-5.0f}); 
+                else roomQueue.push(4);
+                generateRoom(Vector2 {player->pos.x, bkgHeight-player->size[1]-5.0f});
                 break;
             }
         }
@@ -713,6 +718,65 @@ std::unordered_map<Vector2*, float> generateWalls()
     return umap;
 }
 
+void generateEnemies(int n){
+    //Make n new enemies
+    for (int i = 0; i < n; i++){
+        bool isinwall = true;
+        float enemy_x;
+        float enemy_y;
+
+        while (isinwall) {
+            bool repeat = false;
+            //Find a random position in the window for the enemy to spawn
+            int range = bkgWidth - 300;
+            float test_x = 100.0f + float(rand() % range);
+            enemy_x = test_x;
+
+            range = bkgHeight - 300;
+            float test_y = 100.0f + float(rand() % range);
+            enemy_y = test_y;
+
+            //Compare these values with the positions of walls
+            for (auto i: interiorWalls) {
+                Vector2* pos = i.first;
+                float scale = i.second;
+
+                //check the right edge of the wall and the left edge of the enemy are inside eachother as well as
+                //if the top edge of the wall and the bottom edge of the enemy are touching
+                if(((pos->x) + (scale)) >= test_x - 30 && ((pos->y) + (scale) >= test_y - 30)){
+                    repeat = true;
+                    break;
+                }
+
+                //does above but checks for the bottom edge of the enemy and top edge of the wall
+                if(((pos->x) + (scale)) >= test_x - 30 && ((pos->y) - (scale) <= test_y + 30)){
+                    repeat = true;
+                    break;
+                }
+
+                //check if the left edge of the wall and the right edge of the enemy etc...
+                if(((pos->x) - (scale)) >= test_x + 30 && ((pos->y) + (scale) >= test_y - 30)){
+                    repeat = true;
+                    break;
+                }
+
+                //does above but checks for the bottom edge of the enemy and the top edge of the wall
+                if(((pos->x) - (scale)) >= test_x + 30 && ((pos->y) - (scale) >= test_y + 30)){
+                    repeat = true;
+                    break;
+                }
+            }
+
+            if(not repeat){
+                isinwall = false;
+            }
+        }
+
+        GameObject* enemy = new GameObject(enemyImg, 100, enemy_x, enemy_y, 0.0f, ENEMY);
+        gameObjects.push_back(enemy);
+    }
+}
+
 void loadImages()
 {
     // load background
@@ -725,6 +789,7 @@ void loadImages()
 
     // player
     playerImg = Gdiplus::Image::FromFile(L"images/Player.png");
+    enemyImg = Gdiplus::Image::FromFile(L"images/Enemy.png");
     // items
     batteryImg = Gdiplus::Image::FromFile(L"images/Battery.png");
     gem0Img = Gdiplus::Image::FromFile(L"images/Gem0.png");
@@ -802,6 +867,7 @@ void generateRoom(Vector2 playerPos)
 
     placeItems();
     placeWalls();
+    generateEnemies(numEnemies);
 }
 
 int loadGlobals()
@@ -814,7 +880,7 @@ int loadGlobals()
     if (!file) return -1;
 
     // read in data
-    fscanf(file, "%f\t%f\t%d\t%f\t%d", 
+    fscanf(file, "%f\t%f\t%d\t%f\t%d",
         &flashRange, &flashWidth,
         &initialBullets, &maxCharge, &gemsSaved);
 
@@ -834,7 +900,7 @@ int saveGlobals()
 
     // write data
     fprintf(file, "%f\t%f\t%d\t%f\t%d",
-        flashRange, flashWidth, 
+        flashRange, flashWidth,
         initialBullets, maxCharge, gemsSaved);
 
     fclose(file);

@@ -539,7 +539,7 @@ void handleCollisions()
                         else break;
                     } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
                     //NEW FOR ENEMY
-                    if (obj0->entityType == ENEMY && obj1->entityType == PLAYER){
+                    else if (obj0->entityType == PLAYER && obj1->entityType == ENEMY){
                         player->health -= 1;
                         std::cout << player->health << std::endl;
                     }
@@ -554,6 +554,11 @@ void handleCollisions()
                             if (res == 0) continue;
                             else break;
                         } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
+                        //NEW FOR ENEMY
+                        if (obj0->entityType == PLAYER && obj1->entityType == ENEMY){
+                            player->health -= 1;
+                            std::cout << player->health << std::endl;
+                        }
                         else if (dLeft>dTop) obj0->pos.y = b1;
                         else obj0->pos.x = r1;
                     } else if (dBottom>0) {
@@ -562,6 +567,11 @@ void handleCollisions()
                             if (res == 0) continue;
                             else break;
                         } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
+                        //NEW FOR ENEMY
+                        if (obj0->entityType == PLAYER && obj1->entityType == ENEMY){
+                            player->health -= 1;
+                            std::cout << player->health << std::endl;
+                        }
                         else if (dLeft>dBottom) obj0->pos.y = t1-obj0->size[1];
                         else obj0->pos.x = r1;
                     }
@@ -574,7 +584,7 @@ void handleCollisions()
                         else break;
                     } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
                     //NEW FOR ENEMY
-                    if (obj0->entityType == ENEMY && obj1->entityType == PLAYER){
+                    if (obj0->entityType == PLAYER && obj1->entityType == ENEMY){
                         player->health -= 1;
                         std::cout << player->health << std::endl;
                     }
@@ -589,6 +599,11 @@ void handleCollisions()
                             if (res == 0) continue;
                             else break;
                         } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
+                        //NEW FOR ENEMY
+                        if (obj0->entityType == PLAYER && obj1->entityType == ENEMY){
+                            player->health -= 1;
+                            std::cout << player->health << std::endl;
+                        }
                         else if (dRight>dTop) obj0->pos.y = b1;
                         else obj0->pos.x = l1-obj0->size[0];
                     } else if (dBottom>0) {
@@ -597,6 +612,11 @@ void handleCollisions()
                             if (res == 0) continue;
                             else break;
                         } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
+                        //NEW FOR ENEMY
+                        if (obj0->entityType == PLAYER && obj1->entityType == ENEMY){
+                            player->health -= 1;
+                            std::cout << player->health << std::endl;
+                        }
                         else if (dRight>dBottom) obj0->pos.y = t1-obj0->size[1];
                         else obj0->pos.x = l1-obj0->size[0];
                     }
@@ -609,7 +629,7 @@ void handleCollisions()
                         else break;
                     } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
                     //NEW FOR ENEMY
-                    if (obj0->entityType == ENEMY && obj1->entityType == PLAYER){
+                    else if (obj0->entityType == PLAYER && obj1->entityType == ENEMY){
                         player->health -= 1;
                         std::cout << player->health << std::endl;
                     }
@@ -623,7 +643,7 @@ void handleCollisions()
                         else break;
                     } else if (obj1->entityType>=BATTERY&&obj1->entityType<=AMMO) pickUpItem(gameObjects[i], gameObjects[j], &j);
                     //NEW FOR ENEMY
-                    if (obj0->entityType == ENEMY && obj1->entityType == PLAYER){
+                    if (obj0->entityType == PLAYER && obj1->entityType == ENEMY){
                         player->health -= 1;
                         std::cout << player->health << std::endl;
                     }
@@ -677,8 +697,6 @@ void checkidle(){
                 }
                 else {
                     float slope = (delta_y) / (delta_x);
-                    std::cout << "current slope: " << slope << std::endl;
-
 
                     for(int j = player->pos.x; j < gameObjects[i]->pos.x; j++){
                         int y_pos = (slope*j) + player->pos.x;

@@ -106,6 +106,11 @@ int WINAPI wndMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine,
             pauseState = VICTORY;
         } else pauseState = PAUSE;
 
+        if (player->health == 0){
+            gameIsPaused = true;
+            pauseState = LOSS;
+        }
+
         updateGameObjects();
 
         // decrease flashlight charge, drain ambient light
@@ -990,6 +995,10 @@ void drawPauseMenuUI(Gdiplus::Graphics& graphics, int state)
     } else if (state == VICTORY) {
         text = L"Success!";
         placeText(wndWidth/2-100, wndHeight/8, text, Gdiplus::Color(255,255,255), 30, graphics);
+    }
+    else if (state == LOSS) {
+        text = L"Loss :(";
+        placeText(wndWidth/2-65, wndHeight/8, text, Gdiplus::Color(255,255,255), 30, graphics);
     }
 
     // flashlight range

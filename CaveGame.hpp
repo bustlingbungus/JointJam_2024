@@ -39,6 +39,8 @@ REMEMBER TO LINK WITH -lgdi32 and -lgdiplus WHEN COMPILING !!!!!
 #include <ctime>
 #include <cmath>
 
+#pragma comment (lib, "Gdiplus.lib")
+
 // structs & classes
 // stores x and y dimensions as floats
 struct Vector2{

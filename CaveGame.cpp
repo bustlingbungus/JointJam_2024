@@ -679,19 +679,19 @@ std::unordered_map<Vector2*, float> generateWalls()
 void loadImages()
 {
     // load background
-    background = Gdiplus::Image::FromFile(L"Background.png");
+    background = Gdiplus::Image::FromFile(L"images/Background.png");
     bkgWidth = background->GetWidth(); bkgHeight = background->GetHeight();
     // bullet texture
-    bulletImg = Gdiplus::Image::FromFile(L"Bullet.png");
+    bulletImg = Gdiplus::Image::FromFile(L"images/Bullet.png");
     // interior walls
-    Wall0Img = Gdiplus::Image::FromFile(L"Wall0.png");
+    Wall0Img = Gdiplus::Image::FromFile(L"images/Wall0.png");
 
     // player
-    playerImg = Gdiplus::Image::FromFile(L"Player.png");
+    playerImg = Gdiplus::Image::FromFile(L"images/Player.png");
     // items
-    batteryImg = Gdiplus::Image::FromFile(L"Battery.png");
-    gem0Img = Gdiplus::Image::FromFile(L"Gem0.png");
-    ammoImg = Gdiplus::Image::FromFile(L"Ammo.png");
+    batteryImg = Gdiplus::Image::FromFile(L"images/Battery.png");
+    gem0Img = Gdiplus::Image::FromFile(L"images/Gem0.png");
+    ammoImg = Gdiplus::Image::FromFile(L"images/Ammo.png");
 }
 
 void placeItems()

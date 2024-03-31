@@ -6,7 +6,12 @@
 #define PLAYER 1
 #define PLAYER_BULLET 2
 #define WALL 3
+#define BATTERY 4
+#define GEM 5
+#define AMMO 6
+
 #define MIN(a,b) (a<b)? a : b
+#define MAX(a,b) (a>b)? a : b
 // typedefs
 typedef unsigned char uint8; // 8 bit unsigned integer
 
@@ -29,6 +34,8 @@ REMEMBER TO LINK WITH -lgdi32 and -lgdiplus WHEN COMPILING !!!!!
 // std
 #include <iostream>
 #include <vector>
+#include <string>
+#include <unordered_map>
 #include <ctime>
 #include <cmath>
 
@@ -104,6 +111,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 void InitialiseOffscreenDC(HWND hwnd);
 void copyOffscreenToWindow(HDC hdc);
 void createBufferFrame(HWND hwnd);
+void loadImages();
 
 float DeltaTime(); // time elapsed between frames
 
@@ -111,17 +119,28 @@ float DeltaTime(); // time elapsed between frames
 void drawGameObject(GameObject * obj, Gdiplus::Graphics * graphics);
 void drawBackgroundSection(Gdiplus::Graphics& graphics, Gdiplus::Image* image);
 void illuminateFlashLight(Gdiplus::Graphics& graphics);
+// text
+void placeText(int x, int y, std::wstring text, Gdiplus::Graphics& graphics);
 
 // game objects
 void shootBullet(int x, int y);
 void updateVelocities();
 void updatePositions();
 void updateGameObjects();
-void deallocateGameObjects();
+
+void placeWalls();
+
+void drainLight();
 
 void handleCollisions();
 int bulletHit(GameObject* obj0, GameObject* obj1, int* i, int* j);
+void pickUpItem(GameObject* obj0, GameObject* obj1, int* j);
 
 // conversions/logic
 Vector2 getWorldSpaceCoords(float x, float y); // converts from window coordinates to corridinates in game
 Gdiplus::Point getScreenCoords(float x, float y);
+
+// generation
+std::unordered_map<Vector2*, float> generateWalls();
+void placeItems();
+void generateRoom(Vector2 playerPos);
